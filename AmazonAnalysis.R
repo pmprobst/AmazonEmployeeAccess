@@ -10,27 +10,54 @@ test_data <- vroom("data/test.csv")
 #Create Recipe
 my_recipe <- recipe(ACTION ~ . ,data = train_data) %>%
   step_mutate_at(all_numeric_predictors() ,fn = factor) %>%
-  step_other(all_nominal_predictors() ,threshold = .001) %>%
+  #not as necessary for peanalized regression
+  step_other(all_nominal_predictors() ,threshold = .01) %>% 
   step_dummy(all_nominal_predictors())
+  ##normalize features
 
 #Prep & Bake Recipe
 prep <- prep(my_recipe)
 baked <- bake(prep ,new_data = train_data)
 
 #Set Up Logistic Regression Model
-logRegModel <- logistic_reg() %>%
-  set_engine("glm")
+PenLogRegModel <- logistic_reg(mixture = tune() ,penalty()) %>%
+  set_engine("glmnet")
 
 #Set Workflow
 wf <- workflow() %>%
   add_recipe(my_recipe) %>%
-  add_model(logRegModel)
+  add_model(PenLogRegModel)
+
+#set up grid of tuning values
+tuning_grid <- gride_regular(penalty()
+                             ,mixture()
+                             ,levels = 2)
+
+folds <- vfold_cv(train_data ,v = 10 ,repeats = 1)
+
+#CV
+CV_results <- wf %>%
+  tune_grid(resamples = folds
+              ,grid = tuning_grid
+              ,metrics = metric_set(roc_auc()))
+
+bestTune <- CV_results %>%
+  select_best("roc_auc")
+
+#finalize and fit workflow
+final_wf <-
+  wf %>%
+  finalize_workflow(bestTune) %>%
+  fit(data = train_data)
+
+#final_wf %>%
+#  predict(new_data = test_data , type = "prob")
 
 #Train Logistic Regression Model
-train <- fit(wf, train_data)
+#train <- fit(wf, train_data)
 
 #Get Predictions
-predictions <-predict(train,
+predictions <-predict(final_wf,
                       new_data = test_data
                       ,type = "prob")
 
