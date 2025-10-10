@@ -35,5 +35,17 @@ predictions <-predict(train,
                       ,type = "prob")
 
 #Remove p(0) column from df
-predictions <- predictions %>% select(-pr0)
-#waiting to see what the p(0) column name is
+predictions <- predictions %>% 
+  select(-.pred_0) %>%
+  #rename .pred_1 as "action" for kaggle submission
+  rename (Action = .pred_1)
+
+
+# Combine with test_data ID
+kaggle_submission <- bind_cols(
+  test_data %>% select(id),
+  predictions
+)
+
+#write submission df to CSV for submission
+vroom_write(kaggle_submission, "LogRegModelSubmission.csv" ,delim = ",")
