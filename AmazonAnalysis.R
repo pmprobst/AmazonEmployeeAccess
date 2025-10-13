@@ -1,6 +1,7 @@
 #AmazonAnalysis
 library(tidymodels)
 library(embed)
+library(vroom)
 
 #Read data in, set ACTION feature as factor
 train_data <- vroom("data/train.csv") %>%
@@ -20,7 +21,7 @@ prep <- prep(my_recipe)
 baked <- bake(prep ,new_data = train_data)
 
 #Set Up Logistic Regression Model
-PenLogRegModel <- logistic_reg(mixture = tune() ,penalty()) %>%
+PenLogRegModel <- logistic_reg(mixture = tune() ,penalty = tune()) %>%
   set_engine("glmnet")
 
 #Set Workflow
@@ -29,9 +30,9 @@ wf <- workflow() %>%
   add_model(PenLogRegModel)
 
 #set up grid of tuning values
-tuning_grid <- gride_regular(penalty()
+tuning_grid <- grid_regular(penalty()
                              ,mixture()
-                             ,levels = 2)
+                             ,levels = 10)
 
 folds <- vfold_cv(train_data ,v = 10 ,repeats = 1)
 
@@ -39,10 +40,10 @@ folds <- vfold_cv(train_data ,v = 10 ,repeats = 1)
 CV_results <- wf %>%
   tune_grid(resamples = folds
               ,grid = tuning_grid
-              ,metrics = metric_set(roc_auc()))
+              ,metrics = metric_set(roc_auc))
 
 bestTune <- CV_results %>%
-  select_best("roc_auc")
+  select_best(metric = "roc_auc")
 
 #finalize and fit workflow
 final_wf <-
@@ -50,11 +51,13 @@ final_wf <-
   finalize_workflow(bestTune) %>%
   fit(data = train_data)
 
-#final_wf %>%
-#  predict(new_data = test_data , type = "prob")
+#Identify the best levels of penalty and mixture (highest mean)
+CV_results %>%
+  collect_metrics() %>%
+  arrange(desc(mean))
 
-#Train Logistic Regression Model
-#train <- fit(wf, train_data)
+#plot levels of penalty and mixture
+autoplot(CV_results)
 
 #Get Predictions
 predictions <-predict(final_wf,
@@ -75,4 +78,4 @@ kaggle_submission <- bind_cols(
 )
 
 #write submission df to CSV for submission
-vroom_write(kaggle_submission, "LogRegModelSubmission.csv" ,delim = ",")
+vroom_write(kaggle_submission, "PenLogRegModelSubmission.csv" ,delim = ",")
