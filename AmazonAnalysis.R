@@ -21,27 +21,29 @@ my_recipe <- recipe(ACTION ~ . ,data = train_data) %>%
 prep <- prep(my_recipe)
 baked <- bake(prep ,new_data = train_data)
 
-#Set Up K Nearest Neighbors
-knn_model <- nearest_neighbor(
-  mode      = "classification",
-  neighbors = tune(),
-  weight_func = "rectangular",  # standard unweighted KNN
-  dist_power = 2
-  ) %>% set_engine("kknn")
+#Set Up Random Forest Model
+rf_model <- rand_forest(
+  mtry  = tune(),
+  min_n = tune(),
+  trees = 500
+) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
 
 #Set Workflow
 wf <- workflow() %>%
   add_recipe(my_recipe) %>%
-  add_model(knn_model)
+  add_model(rf_model)
 
 #set up grid of tuning values
 tuning_grid <- grid_regular(
-                  neighbors(range = c(1L, 51L)),
+                  mtry(range = c(1L, 50L)),
+                  min_n(),
                   levels = 5)
 
 folds <- vfold_cv(train_data ,v = 3 ,repeats = 1)
 
-#CV
+#Cross Validation
 CV_results <- wf %>%
   tune_grid(resamples = folds
               ,grid = tuning_grid
@@ -83,4 +85,4 @@ kaggle_submission <- bind_cols(
 )
 
 #write submission df to CSV for submission
-vroom_write(kaggle_submission, "KNNSubmission.csv" ,delim = ",")
+vroom_write(kaggle_submission, "RandomForestSubmission.csv" ,delim = ",")
