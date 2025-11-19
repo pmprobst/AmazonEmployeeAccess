@@ -3,6 +3,7 @@ library(tidymodels)
 library(embed)
 library(vroom)
 
+
 #Read data in, set ACTION feature as factor
 train_data <- vroom("data/train.csv") %>%
   mutate(ACTION = factor(ACTION))
@@ -36,9 +37,9 @@ wf <- workflow() %>%
 #set up grid of tuning values
 tuning_grid <- grid_regular(
                   neighbors(range = c(1L, 51L)),
-                  levels = 20)
+                  levels = 5)
 
-folds <- vfold_cv(train_data ,v = 10 ,repeats = 1)
+folds <- vfold_cv(train_data ,v = 3 ,repeats = 1)
 
 #CV
 CV_results <- wf %>%
