@@ -83,4 +83,4 @@ kaggle_submission <- bind_cols(
 )
 
 #write submission df to CSV for submission
-vroom_write(kaggle_submission, "PenLogRegModelSubmission.csv" ,delim = ",")
+vroom_write(kaggle_submission, "KNNSubmission.csv" ,delim = ",")
