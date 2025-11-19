@@ -20,19 +20,23 @@ my_recipe <- recipe(ACTION ~ . ,data = train_data) %>%
 prep <- prep(my_recipe)
 baked <- bake(prep ,new_data = train_data)
 
-#Set Up Logistic Regression Model
-PenLogRegModel <- logistic_reg(mixture = tune() ,penalty = tune()) %>%
-  set_engine("glmnet")
+#Set Up K Nearest Neighbors
+knn_model <- nearest_neighbor(
+  mode      = "classification",
+  neighbors = tune(),
+  weight_func = "rectangular",  # standard unweighted KNN
+  dist_power = 2
+  ) %>% set_engine("kknn")
 
 #Set Workflow
 wf <- workflow() %>%
   add_recipe(my_recipe) %>%
-  add_model(PenLogRegModel)
+  add_model(knn_model)
 
 #set up grid of tuning values
-tuning_grid <- grid_regular(penalty()
-                             ,mixture()
-                             ,levels = 10)
+tuning_grid <- grid_regular(
+                  neighbors(range = c(1L, 51L)),
+                  levels = 20)
 
 folds <- vfold_cv(train_data ,v = 10 ,repeats = 1)
 
