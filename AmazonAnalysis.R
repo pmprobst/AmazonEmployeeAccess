@@ -3,7 +3,6 @@ library(tidymodels)
 library(embed)
 library(vroom)
 library(kernlab)
-install.packages("kernlab") # Required for SVM models with tidymodels
 
 set.seed(348)  # for reproducibility
 
@@ -12,9 +11,9 @@ set.seed(348)  # for reproducibility
 ###############################################################################
 
 # Read data in, set ACTION as a factor (binary classification outcome)
-train_data <- vroom("data/train.csv") %>%
+train_data <- vroom("Data/train.csv") %>%
   mutate(ACTION = factor(ACTION))
-test_data  <- vroom("data/test.csv")
+test_data  <- vroom("Data/test.csv")
 
 ###############################################################################
 # 2. Preprocessing recipe with PCA
@@ -37,7 +36,7 @@ svm_recipe <- recipe(ACTION ~ ., data = train_data) %>%
 # 3. Resampling for model tuning
 ###############################################################################
 
-folds <- vfold_cv(train_data, v = 3, repeats = 1)
+folds <- vfold_cv(train_data, v = 10, repeats = 2)  # 10-fold CV with 2 repeats for maximum robustness
 
 ###############################################################################
 # 4. Define SVM model specifications
@@ -54,7 +53,8 @@ folds <- vfold_cv(train_data, v = 3, repeats = 1)
 svm_linear_spec <- svm_linear(
   cost = tune()              # regularization strength
 ) %>%
-  set_engine("kernlab") %>%
+  set_engine("kernlab", 
+             cache = 500) %>%  # maximum cache size for server execution
   set_mode("classification")
 
 svm_linear_wf <- workflow() %>%
@@ -62,8 +62,8 @@ svm_linear_wf <- workflow() %>%
   add_model(svm_linear_spec)
 
 linear_grid <- grid_regular(
-  cost(range = c(-5, 5)),    # cost on log2 scale (kernlab uses 2^cost)
-  levels = 7
+  cost(range = c(-6, 4)),    # very wide cost range on log2 scale (0.015625 to 16)
+  levels = 20                 # 20 combinations for exhaustive tuning
 )
 
 svm_linear_res <- svm_linear_wf %>%
@@ -85,10 +85,11 @@ best_linear_metrics <- svm_linear_res %>%
 
 svm_poly_spec <- svm_poly(
   cost          = tune(),
-  degree        = tune(),    # polynomial degree
-  scale_factor  = tune()     # scaling of input features
+  degree        = tune(),      # tune degree (2, 3, 4, or 5)
+  scale_factor  = tune()       # scaling of input features
 ) %>%
-  set_engine("kernlab") %>%
+  set_engine("kernlab",
+             cache = 500) %>%  # maximum cache size for server execution
   set_mode("classification")
 
 svm_poly_wf <- workflow() %>%
@@ -96,10 +97,10 @@ svm_poly_wf <- workflow() %>%
   add_model(svm_poly_spec)
 
 poly_grid <- grid_regular(
-  cost(range = c(-5, 5)),
-  degree(range = c(2L, 4L)),
-  scale_factor(range = c(-5, 5)),
-  levels = 3
+  cost(range = c(-5, 3)),      # very wide cost range
+  degree(range = c(2, 5)),      # tune degree from 2 to 5
+  scale_factor(range = c(-5, 1)), # very wide scale factor range
+  levels = 8                     # 8×8×8 = 512 combinations for exhaustive tuning
 )
 
 svm_poly_res <- svm_poly_wf %>%
@@ -123,7 +124,8 @@ svm_rbf_spec <- svm_rbf(
   cost       = tune(),
   rbf_sigma  = tune()        # kernel width parameter
 ) %>%
-  set_engine("kernlab") %>%
+  set_engine("kernlab",
+             cache = 500) %>%  # maximum cache size for server execution
   set_mode("classification")
 
 svm_rbf_wf <- workflow() %>%
@@ -131,9 +133,9 @@ svm_rbf_wf <- workflow() %>%
   add_model(svm_rbf_spec)
 
 rbf_grid <- grid_regular(
-  cost(range = c(-5, 5)),
-  rbf_sigma(range = c(-5, 5)),
-  levels = 5
+  cost(range = c(-6, 4)),      # very wide cost range
+  rbf_sigma(range = c(-6, 2)),  # very wide sigma range
+  levels = 15                   # 15×15 = 225 combinations for exhaustive tuning
 )
 
 svm_rbf_res <- svm_rbf_wf %>%
@@ -205,7 +207,8 @@ svm_predictions <- svm_predictions %>%
 kaggle_submission <- bind_cols(
   test_data %>% select(id),
   svm_predictions
-)
+) %>%
+  rename(Id = id)  # Match sample submission format: "Id" (capital I) and "Action"
 
 vroom_write(
   kaggle_submission,
