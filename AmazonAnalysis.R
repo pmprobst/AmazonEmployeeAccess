@@ -21,68 +21,139 @@ my_recipe <- recipe(ACTION ~ . ,data = train_data) %>%
 prep <- prep(my_recipe)
 baked <- bake(prep ,new_data = train_data)
 
-#Set Up Random Forest Model
-rf_model <- rand_forest(
-  mtry  = tune(),
-  min_n = tune(),
-  trees = 500
+#=============================================================================
+# NAIVE BAYES CLASSIFIER
+#=============================================================================
+# Naive Bayes is a probabilistic classifier based on applying Bayes' theorem
+# with strong (naive) independence assumptions between features. It works well
+# for categorical data and is computationally efficient.
+#
+# Key assumptions:
+# - Features are conditionally independent given the class
+# - All features contribute equally to the classification
+#
+# The Laplace smoothing parameter helps handle zero probabilities when
+# a feature value doesn't appear in the training data for a given class.
+
+#------------------------------------------------------------------------------
+# Step 1: Set Up Naive Bayes Model
+#------------------------------------------------------------------------------
+# Configure the Naive Bayes model with Laplace smoothing parameter to tune
+# Laplace smoothing (also called additive smoothing) prevents zero probabilities
+# by adding a small constant to all counts. This is especially important when
+# dealing with categorical features that may have rare combinations.
+nb_model <- naive_Bayes(
+  Laplace = tune()  # Smoothing parameter to prevent zero probabilities
 ) %>%
-  set_engine("ranger") %>%
+  set_engine("naivebayes") %>%  # Uses the naivebayes package
   set_mode("classification")
 
-#Set Workflow
-wf <- workflow() %>%
+#------------------------------------------------------------------------------
+# Step 2: Create Workflow
+#------------------------------------------------------------------------------
+# Combine the preprocessing recipe with the Naive Bayes model
+nb_wf <- workflow() %>%
   add_recipe(my_recipe) %>%
-  add_model(rf_model)
+  add_model(nb_model)
 
-#set up grid of tuning values
+#------------------------------------------------------------------------------
+# Step 3: Set Up Tuning Grid
+#------------------------------------------------------------------------------
+# Create a grid of Laplace smoothing values to test
+# Laplace values typically range from 0 (no smoothing) to 1 (strong smoothing)
+# We'll test a range to find the optimal smoothing parameter
 tuning_grid <- grid_regular(
-                  mtry(range = c(1L, 50L)),
-                  min_n(),
-                  levels = 5)
+  Laplace(range = c(0, 1)),  # Test values from 0 to 1
+  levels = 10  # Test 10 different values across the range
+)
 
-folds <- vfold_cv(train_data ,v = 3 ,repeats = 1)
+#------------------------------------------------------------------------------
+# Step 4: Cross-Validation Setup
+#------------------------------------------------------------------------------
+# Create 3-fold cross-validation splits for tuning
+# This helps us evaluate model performance across different data subsets
+folds <- vfold_cv(train_data, v = 3, repeats = 1)
 
-#Cross Validation
-CV_results <- wf %>%
-  tune_grid(resamples = folds
-              ,grid = tuning_grid
-              ,metrics = metric_set(roc_auc))
+#------------------------------------------------------------------------------
+# Step 5: Tune Hyperparameters
+#------------------------------------------------------------------------------
+# Perform grid search with cross-validation to find the best Laplace parameter
+# We use ROC-AUC as our evaluation metric since this is a binary classification
+# problem and we want to optimize for ranking performance
+CV_results <- nb_wf %>%
+  tune_grid(
+    resamples = folds,
+    grid = tuning_grid,
+    metrics = metric_set(roc_auc)
+  )
 
+#------------------------------------------------------------------------------
+# Step 6: Select Best Model
+#------------------------------------------------------------------------------
+# Extract the best hyperparameters based on highest ROC-AUC
 bestTune <- CV_results %>%
   select_best(metric = "roc_auc")
 
-#finalize and fit workflow
-final_wf <-
-  wf %>%
-  finalize_workflow(bestTune) %>%
-  fit(data = train_data)
+# Display the best tuning parameters
+print("Best Laplace parameter:")
+print(bestTune)
 
-#Identify the best levels of penalty and mixture (highest mean)
+#------------------------------------------------------------------------------
+# Step 7: Evaluate Tuning Results
+#------------------------------------------------------------------------------
+# View all tuning results sorted by performance
+# This helps understand how sensitive the model is to the Laplace parameter
 CV_results %>%
   collect_metrics() %>%
   arrange(desc(mean))
 
-#plot levels of penalty and mixture
+# Visualize the tuning results
+# The plot shows how ROC-AUC varies with different Laplace values
 autoplot(CV_results)
 
-#Get Predictions
-predictions <-predict(final_wf,
-                      new_data = test_data
-                      ,type = "prob")
+#------------------------------------------------------------------------------
+# Step 8: Finalize and Fit Model
+#------------------------------------------------------------------------------
+# Apply the best hyperparameters and fit the final model on all training data
+final_wf <- nb_wf %>%
+  finalize_workflow(bestTune) %>%
+  fit(data = train_data)
 
-#Remove p(0) column from df
+#=============================================================================
+# PREDICTIONS
+#=============================================================================
+
+#------------------------------------------------------------------------------
+# Step 9: Generate Predictions on Test Data
+#------------------------------------------------------------------------------
+# Use the fitted Naive Bayes model to predict probabilities for test data
+# type = "prob" returns class probabilities (P(ACTION=0) and P(ACTION=1))
+predictions <- predict(
+  final_wf,
+  new_data = test_data,
+  type = "prob"
+)
+
+#------------------------------------------------------------------------------
+# Step 10: Format Predictions for Submission
+#------------------------------------------------------------------------------
+# Remove the probability of class 0 (ACTION=0) and keep only P(ACTION=1)
+# Rename the remaining column to "Action" as required by Kaggle submission format
 predictions <- predictions %>% 
   select(-.pred_0) %>%
-  #rename .pred_1 as "action" for kaggle submission
-  rename (Action = .pred_1)
+  rename(Action = .pred_1)
 
-
-# Combine with test_data ID
+#------------------------------------------------------------------------------
+# Step 11: Create Submission File
+#------------------------------------------------------------------------------
+# Combine test data IDs with predictions
 kaggle_submission <- bind_cols(
   test_data %>% select(id),
   predictions
 )
 
-#write submission df to CSV for submission
-vroom_write(kaggle_submission, "RandomForestSubmission.csv" ,delim = ",")
+# Write submission file to CSV
+# This file can be directly submitted to Kaggle
+vroom_write(kaggle_submission, "NaiveBayesSubmission.csv", delim = ",")
+
+print("Naive Bayes predictions saved to NaiveBayesSubmission.csv")
