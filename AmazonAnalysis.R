@@ -2,7 +2,13 @@
 library(tidymodels)
 library(embed)
 library(vroom)
-
+library(discrim)  # Required for naive_Bayes model specification
+install.packages("naivebayes")
+# Install naivebayes package if not already installed (required for naive_Bayes engine)
+if (!require("naivebayes", quietly = TRUE)) {
+  install.packages("naivebayes")
+  library(naivebayes)
+}
 
 #Read data in, set ACTION feature as factor
 train_data <- vroom("data/train.csv") %>%
