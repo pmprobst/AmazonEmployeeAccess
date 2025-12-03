@@ -6,8 +6,32 @@ library(tidymodels)
 library(embed)
 library(vroom)
 library(kernlab)
+library(doParallel)
+library(parallel)
+library(tune)  # For control_grid()
 
 print("Libraries loaded successfully")
+
+###############################################################################
+# 0. Set up parallel processing
+###############################################################################
+
+# Detect number of available cores
+num_cores <- parallel::detectCores()
+print(paste("Detected", num_cores, "CPU cores"))
+
+# Use all cores except 1 (leave one for system processes)
+# For dedicated servers, you can use all cores by setting: cores_to_use <- num_cores
+cores_to_use <- num_cores
+print(paste("Setting up parallel processing with", cores_to_use, "cores"))
+print(paste("Expected speedup: ~", cores_to_use, "x faster for CV tuning"))
+
+# Create and register parallel backend
+cl <- makePSOCKcluster(cores_to_use)
+registerDoParallel(cl)
+
+print("Parallel processing backend registered successfully")
+print("Note: tune_grid() will automatically use parallel processing")
 
 set.seed(348)  # for reproducibility
 
@@ -47,8 +71,10 @@ svm_recipe <- recipe(ACTION ~ ., data = train_data) %>%
 ###############################################################################
 
 print("Creating cross-validation folds...")
-folds <- vfold_cv(train_data, v = 10, repeats = 2)  # 10-fold CV with 2 repeats for maximum robustness
-print(paste("Created", length(folds$splits), "folds (10-fold CV with 2 repeats)"))
+# Reduced CV to prevent memory issues: 5-fold CV with 1 repeat
+# Original was 10-fold with 2 repeats (20 total runs per grid point)
+folds <- vfold_cv(train_data, v = 5, repeats = 1)  
+print(paste("Created", length(folds$splits), "folds (5-fold CV with 1 repeat)"))
 
 ###############################################################################
 # 4. Define SVM model specifications
@@ -69,7 +95,9 @@ svm_linear_spec <- svm_linear(
   cost = tune()              # regularization strength
 ) %>%
   set_engine("kernlab", 
-             cache = 500) %>%  # maximum cache size for server execution
+             cache = 500,      # maximum cache size for server execution
+             maxiter = 2000,   # increase max iterations to prevent convergence warnings
+             tol = 0.001) %>%  # tolerance for convergence
   set_mode("classification")
 
 print("Creating linear SVM workflow...")
@@ -80,16 +108,18 @@ svm_linear_wf <- workflow() %>%
 print("Setting up linear SVM tuning grid...")
 linear_grid <- grid_regular(
   cost(range = c(-6, 4)),    # very wide cost range on log2 scale (0.015625 to 16)
-  levels = 20                 # 20 combinations for exhaustive tuning
+  levels = 10                 # reduced from 20 to 10 to reduce computational load
 )
 print(paste("Linear grid size:", nrow(linear_grid), "combinations"))
 
 print("Running linear SVM cross-validation...")
+print("Parallel processing will be used automatically by tune_grid()")
 svm_linear_res <- svm_linear_wf %>%
   tune_grid(
     resamples = folds,
     grid      = linear_grid,
-    metrics   = metric_set(roc_auc)
+    metrics   = metric_set(roc_auc),
+    control   = control_grid(parallel_over = "resamples")  # Parallelize over CV folds
   )
 
 print("Linear SVM tuning complete")
@@ -119,7 +149,9 @@ svm_poly_spec <- svm_poly(
   scale_factor  = tune()       # scaling of input features
 ) %>%
   set_engine("kernlab",
-             cache = 500) %>%  # maximum cache size for server execution
+             cache = 500,      # maximum cache size for server execution
+             maxiter = 2000,   # increase max iterations to prevent convergence warnings
+             tol = 0.001) %>%  # tolerance for convergence
   set_mode("classification")
 
 print("Creating polynomial SVM workflow...")
@@ -132,16 +164,18 @@ poly_grid <- grid_regular(
   cost(range = c(-5, 3)),      # very wide cost range
   degree(range = c(2, 5)),      # tune degree from 2 to 5
   scale_factor(range = c(-5, 1)), # very wide scale factor range
-  levels = 8                     # 8×8×8 = 512 combinations for exhaustive tuning
+  levels = 5                     # reduced from 8 to 5 (5×5×5 = 125 instead of 512)
 )
 print(paste("Polynomial grid size:", nrow(poly_grid), "combinations"))
 
 print("Running polynomial SVM cross-validation...")
+print("Parallel processing will be used automatically by tune_grid()")
 svm_poly_res <- svm_poly_wf %>%
   tune_grid(
     resamples = folds,
     grid      = poly_grid,
-    metrics   = metric_set(roc_auc)
+    metrics   = metric_set(roc_auc),
+    control   = control_grid(parallel_over = "resamples")  # Parallelize over CV folds
   )
 
 print("Polynomial SVM tuning complete")
@@ -170,7 +204,9 @@ svm_rbf_spec <- svm_rbf(
   rbf_sigma  = tune()        # kernel width parameter
 ) %>%
   set_engine("kernlab",
-             cache = 500) %>%  # maximum cache size for server execution
+             cache = 500,      # maximum cache size for server execution
+             maxiter = 2000,   # increase max iterations to prevent convergence warnings
+             tol = 0.001) %>%  # tolerance for convergence
   set_mode("classification")
 
 print("Creating RBF SVM workflow...")
@@ -182,16 +218,18 @@ print("Setting up RBF SVM tuning grid...")
 rbf_grid <- grid_regular(
   cost(range = c(-6, 4)),      # very wide cost range
   rbf_sigma(range = c(-6, 2)),  # very wide sigma range
-  levels = 15                   # 15×15 = 225 combinations for exhaustive tuning
+  levels = 10                   # reduced from 15 to 10 (10×10 = 100 instead of 225)
 )
 print(paste("RBF grid size:", nrow(rbf_grid), "combinations"))
 
 print("Running RBF SVM cross-validation...")
+print("Parallel processing will be used automatically by tune_grid()")
 svm_rbf_res <- svm_rbf_wf %>%
   tune_grid(
     resamples = folds,
     grid      = rbf_grid,
-    metrics   = metric_set(roc_auc)
+    metrics   = metric_set(roc_auc),
+    control   = control_grid(parallel_over = "resamples")  # Parallelize over CV folds
   )
 
 print("RBF SVM tuning complete")
@@ -292,5 +330,14 @@ vroom_write(
   delim = ","
 )
 print("Submission file written: SVMSubmission.csv")
+
+###############################################################################
+# 8. Clean up parallel processing
+###############################################################################
+
+print("Stopping parallel processing workers...")
+stopCluster(cl)
+print("Parallel processing workers stopped")
+
 print("=== Script Complete ===")
 print(paste("End time:", Sys.time()))
