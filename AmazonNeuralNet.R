@@ -34,7 +34,7 @@ mlp_tuning_grid <- grid_regular(
   hidden_units(range = c(1L, 10L)),  # Reduced range to avoid too many weights
   penalty(range = c(-5, 0)),  # log10 scale
   epochs(range = c(50L, 200L)),
-  levels = 3  # 3^3 = 27 combinations
+  levels = 7  # 7^3 = 343 combinations
 )
 
 #Create cross-validation folds
@@ -55,6 +55,38 @@ mlp_bestTune <- mlp_CV_results %>%
 #View best tuning parameters
 print("Best MLP Parameters:")
 print(mlp_bestTune)
+
+# View metrics
+mlp_metrics <- mlp_CV_results %>%
+  collect_metrics() %>%
+  arrange(desc(mean))
+
+print(mlp_metrics)
+
+# Create summary of mean(accuracy) by hidden_units
+mlp_hidden_units_acc <- mlp_metrics %>%
+  dplyr::filter(.metric == "accuracy") %>%
+  dplyr::group_by(hidden_units) %>%
+  dplyr::summarise(
+    mean_accuracy = mean(mean),
+    .groups = "drop"
+  )
+
+print("Mean accuracy by hidden_units:")
+print(mlp_hidden_units_acc)
+
+# Plot: hidden_units (x) vs mean(accuracy) (y)
+library(ggplot2)
+
+ggplot(mlp_hidden_units_acc, aes(x = hidden_units, y = mean_accuracy)) +
+  geom_point() +
+  geom_line() +
+  labs(
+    title = "Cross-Validation Accuracy vs Hidden Units",
+    x = "Hidden Units",
+    y = "Mean Accuracy (CV)"
+  ) +
+  theme_minimal()
 
 #View metrics
 mlp_CV_results %>%
