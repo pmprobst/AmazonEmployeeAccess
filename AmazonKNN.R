@@ -25,6 +25,7 @@ my_recipe <- recipe(ACTION ~ . ,data = train_data) %>%
   #not as necessary for peanalized regression
   step_other(all_nominal_predictors() ,threshold = .01) %>% 
   step_dummy(all_nominal_predictors()) %>%
+  step_pca(all_numeric_predictors(), threshold = 0.95) %>%  # PCA: retain 95% variance for speed
   step_smote(ACTION)  # Apply SMOTE to balance classes
   ##normalize features
 

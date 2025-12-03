@@ -13,7 +13,8 @@ mlp_recipe <- recipe(ACTION ~ . ,data = train_data) %>%
   step_mutate_at(all_numeric_predictors() ,fn = factor) %>%
   step_other(all_nominal_predictors() ,threshold = .01) %>% 
   step_dummy(all_nominal_predictors()) %>%
-  step_normalize(all_predictors())  # Normalize features for neural network
+  step_normalize(all_predictors()) %>%  # Normalize features for neural network
+  step_pca(all_numeric_predictors(), threshold = 0.95)  # PCA: retain 95% variance for speed
 
 #Set Up MLP Model
 mlp_model <- mlp(

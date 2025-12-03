@@ -55,16 +55,17 @@ print(paste("Test data loaded:", nrow(test_data), "rows,", ncol(test_data), "col
 #    - Convert rare factor levels to "other"
 #    - Dummy encode all nominal predictors
 #    - Normalize numeric predictors
-#    - Apply PCA to speed up SVM fitting by reducing dimensionality
+#    - Apply PCA with 95% variance threshold to speed up SVM fitting
+#      by reducing dimensionality while retaining most information
 ###############################################################################
 
 svm_recipe <- recipe(ACTION ~ ., data = train_data) %>%
   step_other(all_nominal_predictors(), threshold = 0.01) %>%
   step_dummy(all_nominal_predictors()) %>%
   step_normalize(all_numeric_predictors()) %>%
-  # Use a fixed number of principal components to reduce dimension.
-  # You can adjust num_comp if you want more/less information retained.
-  step_pca(all_numeric_predictors(), num_comp = 50)
+  # Use variance threshold to reduce dimension for speed
+  # Retains enough components to explain 95% of variance
+  step_pca(all_numeric_predictors(), threshold = 0.95)
 
 ###############################################################################
 # 3. Resampling for model tuning
