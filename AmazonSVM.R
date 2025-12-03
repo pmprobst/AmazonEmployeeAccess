@@ -17,12 +17,12 @@ set.seed(348)  # for reproducibility
 
 # Read data in, set ACTION as a factor (binary classification outcome)
 print("Loading training data...")
-train_data <- vroom("Data/train.csv") %>%
+train_data <- vroom("data/train.csv") %>%
   mutate(ACTION = factor(ACTION))
 print(paste("Training data loaded:", nrow(train_data), "rows,", ncol(train_data), "columns"))
 
 print("Loading test data...")
-test_data  <- vroom("Data/test.csv")
+test_data  <- vroom("data/test.csv")
 print(paste("Test data loaded:", nrow(test_data), "rows,", ncol(test_data), "columns"))
 
 ###############################################################################
