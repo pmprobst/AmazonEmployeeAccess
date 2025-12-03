@@ -1,8 +1,13 @@
 #AmazonAnalysis
+print("=== Starting Amazon Employee Access SVM Classification ===")
+print(paste("Start time:", Sys.time()))
+
 library(tidymodels)
 library(embed)
 library(vroom)
 library(kernlab)
+
+print("Libraries loaded successfully")
 
 set.seed(348)  # for reproducibility
 
@@ -11,9 +16,14 @@ set.seed(348)  # for reproducibility
 ###############################################################################
 
 # Read data in, set ACTION as a factor (binary classification outcome)
+print("Loading training data...")
 train_data <- vroom("Data/train.csv") %>%
   mutate(ACTION = factor(ACTION))
+print(paste("Training data loaded:", nrow(train_data), "rows,", ncol(train_data), "columns"))
+
+print("Loading test data...")
 test_data  <- vroom("Data/test.csv")
+print(paste("Test data loaded:", nrow(test_data), "rows,", ncol(test_data), "columns"))
 
 ###############################################################################
 # 2. Preprocessing recipe with PCA
@@ -36,7 +46,9 @@ svm_recipe <- recipe(ACTION ~ ., data = train_data) %>%
 # 3. Resampling for model tuning
 ###############################################################################
 
+print("Creating cross-validation folds...")
 folds <- vfold_cv(train_data, v = 10, repeats = 2)  # 10-fold CV with 2 repeats for maximum robustness
+print(paste("Created", length(folds$splits), "folds (10-fold CV with 2 repeats)"))
 
 ###############################################################################
 # 4. Define SVM model specifications
@@ -50,6 +62,9 @@ folds <- vfold_cv(train_data, v = 10, repeats = 2)  # 10-fold CV with 2 repeats 
 ###############################################################################
 
 # 4.1 Linear SVM
+print("=== Starting Linear SVM Tuning ===")
+print(paste("Linear SVM start time:", Sys.time()))
+
 svm_linear_spec <- svm_linear(
   cost = tune()              # regularization strength
 ) %>%
@@ -57,15 +72,19 @@ svm_linear_spec <- svm_linear(
              cache = 500) %>%  # maximum cache size for server execution
   set_mode("classification")
 
+print("Creating linear SVM workflow...")
 svm_linear_wf <- workflow() %>%
   add_recipe(svm_recipe) %>%
   add_model(svm_linear_spec)
 
+print("Setting up linear SVM tuning grid...")
 linear_grid <- grid_regular(
   cost(range = c(-6, 4)),    # very wide cost range on log2 scale (0.015625 to 16)
   levels = 20                 # 20 combinations for exhaustive tuning
 )
+print(paste("Linear grid size:", nrow(linear_grid), "combinations"))
 
+print("Running linear SVM cross-validation...")
 svm_linear_res <- svm_linear_wf %>%
   tune_grid(
     resamples = folds,
@@ -73,15 +92,26 @@ svm_linear_res <- svm_linear_wf %>%
     metrics   = metric_set(roc_auc)
   )
 
+print("Linear SVM tuning complete")
+print(paste("Linear SVM end time:", Sys.time()))
+
 best_linear <- svm_linear_res %>%
   select_best(metric = "roc_auc")
 
 best_linear_metrics <- svm_linear_res %>%
   show_best(metric = "roc_auc", n = 1)
 
+print("Best linear SVM parameters:")
+print(best_linear)
+print("Best linear SVM ROC AUC:")
+print(best_linear_metrics)
+
 ###############################################################################
 # 4.2 Polynomial SVM
 ###############################################################################
+
+print("=== Starting Polynomial SVM Tuning ===")
+print(paste("Polynomial SVM start time:", Sys.time()))
 
 svm_poly_spec <- svm_poly(
   cost          = tune(),
@@ -92,17 +122,21 @@ svm_poly_spec <- svm_poly(
              cache = 500) %>%  # maximum cache size for server execution
   set_mode("classification")
 
+print("Creating polynomial SVM workflow...")
 svm_poly_wf <- workflow() %>%
   add_recipe(svm_recipe) %>%
   add_model(svm_poly_spec)
 
+print("Setting up polynomial SVM tuning grid...")
 poly_grid <- grid_regular(
   cost(range = c(-5, 3)),      # very wide cost range
   degree(range = c(2, 5)),      # tune degree from 2 to 5
   scale_factor(range = c(-5, 1)), # very wide scale factor range
   levels = 8                     # 8×8×8 = 512 combinations for exhaustive tuning
 )
+print(paste("Polynomial grid size:", nrow(poly_grid), "combinations"))
 
+print("Running polynomial SVM cross-validation...")
 svm_poly_res <- svm_poly_wf %>%
   tune_grid(
     resamples = folds,
@@ -110,15 +144,26 @@ svm_poly_res <- svm_poly_wf %>%
     metrics   = metric_set(roc_auc)
   )
 
+print("Polynomial SVM tuning complete")
+print(paste("Polynomial SVM end time:", Sys.time()))
+
 best_poly <- svm_poly_res %>%
   select_best(metric = "roc_auc")
 
 best_poly_metrics <- svm_poly_res %>%
   show_best(metric = "roc_auc", n = 1)
 
+print("Best polynomial SVM parameters:")
+print(best_poly)
+print("Best polynomial SVM ROC AUC:")
+print(best_poly_metrics)
+
 ###############################################################################
 # 4.3 Radial (RBF) SVM
 ###############################################################################
+
+print("=== Starting Radial (RBF) SVM Tuning ===")
+print(paste("RBF SVM start time:", Sys.time()))
 
 svm_rbf_spec <- svm_rbf(
   cost       = tune(),
@@ -128,16 +173,20 @@ svm_rbf_spec <- svm_rbf(
              cache = 500) %>%  # maximum cache size for server execution
   set_mode("classification")
 
+print("Creating RBF SVM workflow...")
 svm_rbf_wf <- workflow() %>%
   add_recipe(svm_recipe) %>%
   add_model(svm_rbf_spec)
 
+print("Setting up RBF SVM tuning grid...")
 rbf_grid <- grid_regular(
   cost(range = c(-6, 4)),      # very wide cost range
   rbf_sigma(range = c(-6, 2)),  # very wide sigma range
   levels = 15                   # 15×15 = 225 combinations for exhaustive tuning
 )
+print(paste("RBF grid size:", nrow(rbf_grid), "combinations"))
 
+print("Running RBF SVM cross-validation...")
 svm_rbf_res <- svm_rbf_wf %>%
   tune_grid(
     resamples = folds,
@@ -145,15 +194,25 @@ svm_rbf_res <- svm_rbf_wf %>%
     metrics   = metric_set(roc_auc)
   )
 
+print("RBF SVM tuning complete")
+print(paste("RBF SVM end time:", Sys.time()))
+
 best_rbf <- svm_rbf_res %>%
   select_best(metric = "roc_auc")
 
 best_rbf_metrics <- svm_rbf_res %>%
   show_best(metric = "roc_auc", n = 1)
 
+print("Best RBF SVM parameters:")
+print(best_rbf)
+print("Best RBF SVM ROC AUC:")
+print(best_rbf_metrics)
+
 ###############################################################################
 # 5. Compare kernels and select the best-performing SVM
 ###############################################################################
+
+print("=== Comparing Kernel Performance ===")
 
 linear_auc <- best_linear_metrics$mean[1]
 poly_auc   <- best_poly_metrics$mean[1]
@@ -165,27 +224,39 @@ kernel_performance <- tibble(
 ) %>%
   arrange(desc(roc_auc))
 
-kernel_performance
+print("Kernel performance comparison:")
+print(kernel_performance)
 
 best_kernel <- kernel_performance$kernel[1]
+print(paste("Best kernel selected:", best_kernel))
 
 ###############################################################################
 # 6. Finalize the best SVM workflow and fit on full training data
 ###############################################################################
 
+print("=== Finalizing Best SVM Model ===")
+print(paste("Using", best_kernel, "kernel"))
+
 if (best_kernel == "linear") {
+  print("Finalizing linear SVM workflow...")
   final_svm_wf <- svm_linear_wf %>%
     finalize_workflow(best_linear)
 } else if (best_kernel == "polynomial") {
+  print("Finalizing polynomial SVM workflow...")
   final_svm_wf <- svm_poly_wf %>%
     finalize_workflow(best_poly)
 } else {
+  print("Finalizing RBF SVM workflow...")
   final_svm_wf <- svm_rbf_wf %>%
     finalize_workflow(best_rbf)
 }
 
+print("Fitting final model on full training data...")
+print(paste("Final model fitting start time:", Sys.time()))
 final_svm_fit <- final_svm_wf %>%
   fit(data = train_data)
+print("Final model fitted successfully")
+print(paste("Final model fitting end time:", Sys.time()))
 
 ###############################################################################
 # 7. Generate predictions for Amazon test data and write submission file
@@ -194,24 +265,32 @@ final_svm_fit <- final_svm_wf %>%
 #    - Format matches Kaggle's expected "id" and "Action" columns
 ###############################################################################
 
+print("=== Generating Predictions ===")
+print("Generating predictions on test data...")
 svm_predictions <- predict(
   final_svm_fit,
   new_data = test_data,
   type     = "prob"
 )
+print(paste("Predictions generated for", nrow(svm_predictions), "test samples"))
 
 svm_predictions <- svm_predictions %>%
   select(-.pred_0) %>%
   rename(Action = .pred_1)
 
+print("Preparing submission file...")
 kaggle_submission <- bind_cols(
   test_data %>% select(id),
   svm_predictions
 ) %>%
   rename(Id = id)  # Match sample submission format: "Id" (capital I) and "Action"
 
+print("Writing submission file...")
 vroom_write(
   kaggle_submission,
   "SVMSubmission.csv",
   delim = ","
 )
+print("Submission file written: SVMSubmission.csv")
+print("=== Script Complete ===")
+print(paste("End time:", Sys.time()))
