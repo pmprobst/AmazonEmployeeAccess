@@ -3,86 +3,89 @@ library(tidymodels)
 library(embed)
 library(vroom)
 
-
 #Read data in, set ACTION feature as factor
 train_data <- vroom("data/train.csv") %>%
   mutate(ACTION = factor(ACTION))
 test_data <- vroom("data/test.csv")
 
-#Create Recipe
-my_recipe <- recipe(ACTION ~ . ,data = train_data) %>%
+#Create Recipe for MLP (with normalization for neural networks)
+mlp_recipe <- recipe(ACTION ~ . ,data = train_data) %>%
   step_mutate_at(all_numeric_predictors() ,fn = factor) %>%
-  #not as necessary for peanalized regression
   step_other(all_nominal_predictors() ,threshold = .01) %>% 
-  step_dummy(all_nominal_predictors())
-  ##normalize features
+  step_dummy(all_nominal_predictors()) %>%
+  step_normalize(all_predictors())  # Normalize features for neural network
 
-#Prep & Bake Recipe
-prep <- prep(my_recipe)
-baked <- bake(prep ,new_data = train_data)
-
-#Set Up Random Forest Model
-rf_model <- rand_forest(
-  mtry  = tune(),
-  min_n = tune(),
-  trees = 500
+#Set Up MLP Model
+mlp_model <- mlp(
+  hidden_units = tune(),
+  penalty = tune(),
+  epochs = tune()
 ) %>%
-  set_engine("ranger") %>%
+  set_engine("nnet", MaxNWts = 5000) %>%  # Increase weight limit
   set_mode("classification")
 
-#Set Workflow
-wf <- workflow() %>%
-  add_recipe(my_recipe) %>%
-  add_model(rf_model)
+#Set MLP Workflow
+mlp_wf <- workflow() %>%
+  add_recipe(mlp_recipe) %>%
+  add_model(mlp_model)
 
-#set up grid of tuning values
-tuning_grid <- grid_regular(
-                  mtry(range = c(1L, 50L)),
-                  min_n(),
-                  levels = 5)
+#Set up grid of tuning values for MLP
+mlp_tuning_grid <- grid_regular(
+  hidden_units(range = c(1L, 10L)),  # Reduced range to avoid too many weights
+  penalty(range = c(-5, 0)),  # log10 scale
+  epochs(range = c(50L, 200L)),
+  levels = 3  # 3^3 = 27 combinations
+)
 
+#Create cross-validation folds
 folds <- vfold_cv(train_data ,v = 3 ,repeats = 1)
 
-#Cross Validation
-CV_results <- wf %>%
-  tune_grid(resamples = folds
-              ,grid = tuning_grid
-              ,metrics = metric_set(roc_auc))
+#Cross Validation for MLP (using accuracy metric)
+mlp_CV_results <- mlp_wf %>%
+  tune_grid(
+    resamples = folds,
+    grid = mlp_tuning_grid,
+    metrics = metric_set(accuracy)
+  )
 
-bestTune <- CV_results %>%
-  select_best(metric = "roc_auc")
+#Select best tune based on accuracy
+mlp_bestTune <- mlp_CV_results %>%
+  select_best(metric = "accuracy")
 
-#finalize and fit workflow
-final_wf <-
-  wf %>%
-  finalize_workflow(bestTune) %>%
-  fit(data = train_data)
+#View best tuning parameters
+print("Best MLP Parameters:")
+print(mlp_bestTune)
 
-#Identify the best levels of penalty and mixture (highest mean)
-CV_results %>%
+#View metrics
+mlp_CV_results %>%
   collect_metrics() %>%
   arrange(desc(mean))
 
-#plot levels of penalty and mixture
-autoplot(CV_results)
+#Plot tuning results
+autoplot(mlp_CV_results)
 
-#Get Predictions
-predictions <-predict(final_wf,
-                      new_data = test_data
-                      ,type = "prob")
+#Finalize and fit MLP workflow
+mlp_final_wf <-
+  mlp_wf %>%
+  finalize_workflow(mlp_bestTune) %>%
+  fit(data = train_data)
+
+#Get MLP Predictions
+mlp_predictions <- predict(mlp_final_wf,
+                          new_data = test_data,
+                          type = "prob")
 
 #Remove p(0) column from df
-predictions <- predictions %>% 
+mlp_predictions <- mlp_predictions %>% 
   select(-.pred_0) %>%
-  #rename .pred_1 as "action" for kaggle submission
-  rename (Action = .pred_1)
-
+  #rename .pred_1 as "Action" for kaggle submission
+  rename(Action = .pred_1)
 
 # Combine with test_data ID
-kaggle_submission <- bind_cols(
+mlp_kaggle_submission <- bind_cols(
   test_data %>% select(id),
-  predictions
+  mlp_predictions
 )
 
-#write submission df to CSV for submission
-vroom_write(kaggle_submission, "RandomForestSubmission.csv" ,delim = ",")
+#write MLP submission df to CSV for submission
+vroom_write(mlp_kaggle_submission, "MLPSubmission.csv" ,delim = ",")
