@@ -34,7 +34,7 @@ mlp_tuning_grid <- grid_regular(
   hidden_units(range = c(1L, 10L)),  # Reduced range to avoid too many weights
   penalty(range = c(-5, 0)),  # log10 scale
   epochs(range = c(50L, 200L)),
-  levels = 7  # 7^3 = 343 combinations
+  levels = 3  # 7^3 = 343 combinations
 )
 
 #Create cross-validation folds
