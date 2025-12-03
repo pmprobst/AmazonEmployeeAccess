@@ -3,12 +3,8 @@ library(tidymodels)
 library(embed)
 library(vroom)
 library(discrim)  # Required for naive_Bayes model specification
-install.packages("naivebayes")
 # Install naivebayes package if not already installed (required for naive_Bayes engine)
-if (!require("naivebayes", quietly = TRUE)) {
-  install.packages("naivebayes")
-  library(naivebayes)
-}
+
 
 #Read data in, set ACTION feature as factor
 train_data <- vroom("data/train.csv") %>%
@@ -70,7 +66,7 @@ nb_wf <- workflow() %>%
 # We'll test a range to find the optimal smoothing parameter
 tuning_grid <- grid_regular(
   Laplace(range = c(0, 1)),  # Test values from 0 to 1
-  levels = 10  # Test 10 different values across the range
+  levels = 40  # Test 10 different values across the range
 )
 
 #------------------------------------------------------------------------------
@@ -78,7 +74,7 @@ tuning_grid <- grid_regular(
 #------------------------------------------------------------------------------
 # Create 3-fold cross-validation splits for tuning
 # This helps us evaluate model performance across different data subsets
-folds <- vfold_cv(train_data, v = 3, repeats = 1)
+folds <- vfold_cv(train_data, v = 10, repeats = 1)
 
 #------------------------------------------------------------------------------
 # Step 5: Tune Hyperparameters
