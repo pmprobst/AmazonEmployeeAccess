@@ -8,7 +8,7 @@ library(vroom)
 library(kernlab)
 library(doParallel)
 library(parallel)
-library(tune)  # For control_grid()
+library(tune)  # For control_bayes()
 
 print("Libraries loaded successfully")
 
@@ -31,7 +31,7 @@ cl <- makePSOCKcluster(cores_to_use)
 registerDoParallel(cl)
 
 print("Parallel processing backend registered successfully")
-print("Note: tune_grid() will automatically use parallel processing")
+print("Note: tune_bayes() will automatically use parallel processing")
 
 set.seed(348)  # for reproducibility
 
@@ -72,20 +72,22 @@ svm_recipe <- recipe(ACTION ~ ., data = train_data) %>%
 ###############################################################################
 
 print("Creating cross-validation folds...")
-# Reduced CV to prevent memory issues: 5-fold CV with 1 repeat
-# Original was 10-fold with 2 repeats (20 total runs per grid point)
-folds <- vfold_cv(train_data, v = 5, repeats = 1)  
-print(paste("Created", length(folds$splits), "folds (5-fold CV with 1 repeat)"))
+# Using 3-fold CV for faster Bayesian optimization
+# Bayesian optimization is more efficient than grid search, so fewer folds are needed
+folds <- vfold_cv(train_data, v = 3, repeats = 1)  
+print(paste("Created", length(folds$splits), "folds (3-fold CV with 1 repeat)"))
 
 ###############################################################################
 # 4. Define SVM model specifications
 #
-#    We will tune three kernels:
+#    We will tune three kernels using Bayesian optimization:
 #      - Linear
 #      - Polynomial
 #      - Radial (RBF)
 #
-#    For each, we tune the primary hyperparameters and evaluate ROC AUC.
+#    Bayesian optimization intelligently explores the hyperparameter space,
+#    focusing on promising regions, which is much faster than grid search.
+#    For each kernel, we use 25 iterations to find optimal hyperparameters.
 ###############################################################################
 
 # 4.1 Linear SVM
@@ -106,21 +108,23 @@ svm_linear_wf <- workflow() %>%
   add_recipe(svm_recipe) %>%
   add_model(svm_linear_spec)
 
-print("Setting up linear SVM tuning grid...")
-linear_grid <- grid_regular(
-  cost(range = c(-6, 4)),    # very wide cost range on log2 scale (0.015625 to 16)
-  levels = 10                 # reduced from 20 to 10 to reduce computational load
-)
-print(paste("Linear grid size:", nrow(linear_grid), "combinations"))
-
-print("Running linear SVM cross-validation...")
-print("Parallel processing will be used automatically by tune_grid()")
+print("Running linear SVM Bayesian optimization...")
+print("Using 25 iterations to efficiently explore cost parameter space")
+print("Cost range: log2 scale from -6 to 4 (0.015625 to 16)")
+print("Parallel processing will be used automatically by tune_bayes()")
 svm_linear_res <- svm_linear_wf %>%
-  tune_grid(
+  tune_bayes(
     resamples = folds,
-    grid      = linear_grid,
+    initial   = 5,              # Start with 5 random initial points
+    iter      = 25,             # 25 Bayesian optimization iterations
+    param_info = parameters(
+      cost(range = c(-6, 4))    # cost range on log2 scale
+    ),
     metrics   = metric_set(roc_auc),
-    control   = control_grid(parallel_over = "resamples")  # Parallelize over CV folds
+    control   = control_bayes(
+      parallel_over = "resamples",  # Parallelize over CV folds
+      verbose = TRUE                 # Show progress
+    )
   )
 
 print("Linear SVM tuning complete")
@@ -160,23 +164,25 @@ svm_poly_wf <- workflow() %>%
   add_recipe(svm_recipe) %>%
   add_model(svm_poly_spec)
 
-print("Setting up polynomial SVM tuning grid...")
-poly_grid <- grid_regular(
-  cost(range = c(-5, 3)),      # very wide cost range
-  degree(range = c(2, 5)),      # tune degree from 2 to 5
-  scale_factor(range = c(-5, 1)), # very wide scale factor range
-  levels = 5                     # reduced from 8 to 5 (5×5×5 = 125 instead of 512)
-)
-print(paste("Polynomial grid size:", nrow(poly_grid), "combinations"))
-
-print("Running polynomial SVM cross-validation...")
-print("Parallel processing will be used automatically by tune_grid()")
+print("Running polynomial SVM Bayesian optimization...")
+print("Using 25 iterations to efficiently explore 3D parameter space")
+print("Parameters: cost, degree (2-5), scale_factor")
+print("Parallel processing will be used automatically by tune_bayes()")
 svm_poly_res <- svm_poly_wf %>%
-  tune_grid(
+  tune_bayes(
     resamples = folds,
-    grid      = poly_grid,
+    initial   = 5,              # Start with 5 random initial points
+    iter      = 25,             # 25 Bayesian optimization iterations
+    param_info = parameters(
+      cost(range = c(-5, 3)),           # cost range on log2 scale
+      degree(range = c(2L, 5L)),        # degree: integer from 2 to 5
+      scale_factor(range = c(-5, 1))    # scale_factor range on log2 scale
+    ),
     metrics   = metric_set(roc_auc),
-    control   = control_grid(parallel_over = "resamples")  # Parallelize over CV folds
+    control   = control_bayes(
+      parallel_over = "resamples",  # Parallelize over CV folds
+      verbose = TRUE                 # Show progress
+    )
   )
 
 print("Polynomial SVM tuning complete")
@@ -215,22 +221,24 @@ svm_rbf_wf <- workflow() %>%
   add_recipe(svm_recipe) %>%
   add_model(svm_rbf_spec)
 
-print("Setting up RBF SVM tuning grid...")
-rbf_grid <- grid_regular(
-  cost(range = c(-6, 4)),      # very wide cost range
-  rbf_sigma(range = c(-6, 2)),  # very wide sigma range
-  levels = 10                   # reduced from 15 to 10 (10×10 = 100 instead of 225)
-)
-print(paste("RBF grid size:", nrow(rbf_grid), "combinations"))
-
-print("Running RBF SVM cross-validation...")
-print("Parallel processing will be used automatically by tune_grid()")
+print("Running RBF SVM Bayesian optimization...")
+print("Using 25 iterations to efficiently explore 2D parameter space")
+print("Parameters: cost and rbf_sigma (kernel width)")
+print("Parallel processing will be used automatically by tune_bayes()")
 svm_rbf_res <- svm_rbf_wf %>%
-  tune_grid(
+  tune_bayes(
     resamples = folds,
-    grid      = rbf_grid,
+    initial   = 5,              # Start with 5 random initial points
+    iter      = 25,             # 25 Bayesian optimization iterations
+    param_info = parameters(
+      cost(range = c(-6, 4)),        # cost range on log2 scale
+      rbf_sigma(range = c(-6, 2))    # rbf_sigma range on log2 scale
+    ),
     metrics   = metric_set(roc_auc),
-    control   = control_grid(parallel_over = "resamples")  # Parallelize over CV folds
+    control   = control_bayes(
+      parallel_over = "resamples",  # Parallelize over CV folds
+      verbose = TRUE                 # Show progress
+    )
   )
 
 print("RBF SVM tuning complete")

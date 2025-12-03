@@ -56,8 +56,8 @@ wf <- workflow() %>%
 #set up grid of tuning values
 print("Setting up tuning grid...")
 tuning_grid <- grid_regular(
-                  neighbors(range = c(1L, 51L)),
-                  levels = 5)
+                  neighbors(range = c(1L, 20L)),
+                  levels = 3)
 print(paste("Tuning grid size:", nrow(tuning_grid), "combinations"))
 
 print("Creating cross-validation folds...")
