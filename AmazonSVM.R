@@ -175,7 +175,7 @@ svm_poly_res <- svm_poly_wf %>%
     iter      = 25,             # 25 Bayesian optimization iterations
     param_info = parameters(
       cost(range = c(-5, 3)),           # cost range on log2 scale
-      degree(range = c(2L, 5L)),        # degree: integer from 2 to 5
+      degree(range = c(2, 5)),        # degree: integer from 2 to 5
       scale_factor(range = c(-5, 1))    # scale_factor range on log2 scale
     ),
     metrics   = metric_set(roc_auc),
