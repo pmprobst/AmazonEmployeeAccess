@@ -28,7 +28,7 @@ if (file.exists("R/utils.R")) {
 
 parse_args <- function() {
   args <- commandArgs(trailingOnly = TRUE)
-  out <- list(config = "config.R", output_dir = "results")
+  out <- list(config = "config.R", output_dir = "output/submission")
   i <- 1L
   while (i <= length(args)) {
     if (args[i] == "--config" && i < length(args)) {

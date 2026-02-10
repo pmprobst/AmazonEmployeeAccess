@@ -10,6 +10,7 @@ config <- list(
   train_file = "train.csv",
   test_file = "test.csv",
   results_dir = "results",
+  submission_dir = "output/submission",
   n_folds = 10L,
   cv_repeats = 1L,
   tune_method = "bayes",

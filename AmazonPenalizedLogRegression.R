@@ -2,7 +2,7 @@
 # Amazon Employee Access — Penalized Logistic Regression (grid + SMOTE variant)
 # =============================================================================
 # Thin wrapper around the unified pipeline. Uses config (e.g. use_smote, tune_method).
-# Output: results/penalized_logreg_submission.csv and PenLogRegModelSubmission.csv.
+# Output: output/submission/penalized_logreg_submission.csv and PenLogRegModelSubmission.csv.
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -40,7 +40,8 @@ tune_results <- tune_model(wf, folds, config, param_info = param_info)
 best_params <- select_best_params(tune_results, metric = "roc_auc")
 final_fit <- fit_final_model(wf, best_params, dat$train)
 pred_df <- predict_test(final_fit, dat$test, id_col = "id")
-if (!dir.exists("results")) dir.create("results", recursive = TRUE)
-write_kaggle_submission(pred_df, file.path("results", paste0(model_name, "_submission.csv")))
+sub_dir <- config$submission_dir %||% "output/submission"
+if (!dir.exists(sub_dir)) dir.create(sub_dir, recursive = TRUE)
+write_kaggle_submission(pred_df, file.path(sub_dir, paste0(model_name, "_submission.csv")))
 write_kaggle_submission(pred_df, "PenLogRegModelSubmission.csv")
 log_msg("Done. Submission also written to PenLogRegModelSubmission.csv (legacy).")

@@ -2,7 +2,7 @@
 # Amazon Employee Access — SVM Linear (unified pipeline)
 # =============================================================================
 # Thin wrapper. For full SVM comparison (linear/poly/RBF) use run_model.R or
-# extend R/models.R. Output: results/svm_linear_submission.csv and SVMSubmission.csv (legacy).
+# extend R/models.R. Output: output/submission/svm_linear_submission.csv and SVMSubmission.csv (legacy).
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -40,7 +40,8 @@ tune_results <- tune_model(wf, folds, config, param_info = param_info)
 best_params <- select_best_params(tune_results, metric = "roc_auc")
 final_fit <- fit_final_model(wf, best_params, dat$train)
 pred_df <- predict_test(final_fit, dat$test, id_col = "id")
-if (!dir.exists("results")) dir.create("results", recursive = TRUE)
-write_kaggle_submission(pred_df, file.path("results", "svm_linear_submission.csv"))
+sub_dir <- config$submission_dir %||% "output/submission"
+if (!dir.exists(sub_dir)) dir.create(sub_dir, recursive = TRUE)
+write_kaggle_submission(pred_df, file.path(sub_dir, "svm_linear_submission.csv"))
 write_kaggle_submission(pred_df, "SVMSubmission.csv")
 log_msg("Done. Submission also written to SVMSubmission.csv (legacy).")

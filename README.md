@@ -31,7 +31,9 @@ A modular machine learning pipeline for the **Kaggle Amazon Employee Access** pr
 ├── data/
 │   ├── train.csv
 │   └── test.csv
-├── results/              # Submission and tune outputs (created when run)
+├── output/
+│   └── submission/       # Submission CSVs (default; created when run)
+├── results/             # Tune RDS and metrics (when using results_dir)
 ├── Amazon*.R             # Thin wrappers per model (backwards compatibility)
 ├── ENVIRONMENT.md        # R packages and reproducibility
 └── README.md
@@ -48,16 +50,16 @@ A modular machine learning pipeline for the **Kaggle Amazon Employee Access** pr
 2. **Run a single model** from the project root:
    ```bash
    Rscript run_model.R --model penalized_logreg
-   Rscript run_model.R --model rf --output_dir results
+   Rscript run_model.R --model rf --output_dir output/submission
    ```
-   Valid `--model` values: `penalized_logreg`, `logreg`, `rf`, `knn`, `nb`, `svm_linear`, `mlp`.
+   Submissions are written to `output/submission/` by default. Valid `--model` values: `penalized_logreg`, `logreg`, `rf`, `knn`, `nb`, `svm_linear`, `mlp`.
 
 3. **Run multiple models** and write metrics to `results/all_models_metrics.csv`:
    ```bash
    Rscript run_all_models.R --output_dir results
    ```
 
-4. **Legacy scripts:** Each `Amazon*.R` script (e.g. `AmazonLogisticRegression.R`) is a thin wrapper that runs the same pipeline for that model and writes both `results/<model>_submission.csv` and the original submission filename (e.g. `LogRegModelSubmission.csv`). Run from the project root in R:
+4. **Legacy scripts:** Each `Amazon*.R` script (e.g. `AmazonLogisticRegression.R`) is a thin wrapper that runs the same pipeline for that model and writes to `output/submission/<model>_submission.csv` and the original submission filename (e.g. `LogRegModelSubmission.csv`). Run from the project root in R:
    ```r
    source("AmazonLogisticRegression.R")
    ```
@@ -66,7 +68,7 @@ A modular machine learning pipeline for the **Kaggle Amazon Employee Access** pr
 
 Edit `config.R` to change:
 
-- `seed`, `data_dir`, `results_dir`
+- `seed`, `data_dir`, `results_dir`, `submission_dir` (default `output/submission`)
 - `n_folds`, `cv_repeats`, `tune_method` (`"bayes"` or `"grid"`), `bayes_initial`, `bayes_iter`
 - `use_smote`, `pca_threshold`, `rare_threshold`
 - Model-specific tuning ranges (e.g. `logreg_penalty_range`, `rf_mtry_range`)
@@ -75,4 +77,4 @@ Defaults work without editing; override only what you need.
 
 ## Results
 
-Submission files are written to `results/<model>_submission.csv` (and optionally to the legacy names in the project root). Tune results can be saved as `results/<model>_tune_results.rds` when using `run_model.R`. Compare models via `results/all_models_metrics.csv` after running `run_all_models.R`.
+Submission files are written to `output/submission/<model>_submission.csv` by default (and optionally to legacy names in the project root). With `run_model.R`, tune results are saved in the same output dir (e.g. `output/submission/<model>_tune_results.rds`). With `run_all_models.R`, metrics are written to the output dir as `all_models_metrics.csv`.

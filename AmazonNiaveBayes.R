@@ -1,7 +1,7 @@
 # =============================================================================
 # Amazon Employee Access — Naive Bayes (unified pipeline)
 # =============================================================================
-# Thin wrapper. Output: results/nb_submission.csv and NaiveBayesSubmission.csv (legacy).
+# Thin wrapper. Output: output/submission/nb_submission.csv and NaiveBayesSubmission.csv (legacy).
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -39,7 +39,8 @@ tune_results <- tune_model(wf, folds, config, param_info = param_info)
 best_params <- select_best_params(tune_results, metric = "roc_auc")
 final_fit <- fit_final_model(wf, best_params, dat$train)
 pred_df <- predict_test(final_fit, dat$test, id_col = "id")
-if (!dir.exists("results")) dir.create("results", recursive = TRUE)
-write_kaggle_submission(pred_df, file.path("results", "nb_submission.csv"))
+sub_dir <- config$submission_dir %||% "output/submission"
+if (!dir.exists(sub_dir)) dir.create(sub_dir, recursive = TRUE)
+write_kaggle_submission(pred_df, file.path(sub_dir, "nb_submission.csv"))
 write_kaggle_submission(pred_df, "NaiveBayesSubmission.csv")
 log_msg("Done. Submission also written to NaiveBayesSubmission.csv (legacy).")

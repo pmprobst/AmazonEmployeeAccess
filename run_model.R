@@ -40,7 +40,7 @@ parse_args <- function() {
   out <- list(
     model = "penalized_logreg",
     config = "config.R",
-    output_dir = "results"
+    output_dir = "output/submission"
   )
   i <- 1L
   while (i <= length(args)) {

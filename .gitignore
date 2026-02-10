@@ -1,5 +1,6 @@
 # Results and outputs
 results/
+output/submission/*.csv
 *.rds
 sessionInfo.txt
 
