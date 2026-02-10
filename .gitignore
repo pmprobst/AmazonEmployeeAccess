@@ -1,0 +1,12 @@
+# Results and outputs
+results/
+*.rds
+sessionInfo.txt
+
+# R
+.Rhistory
+.RData
+.Ruserdata
+
+# OS
+.DS_Store

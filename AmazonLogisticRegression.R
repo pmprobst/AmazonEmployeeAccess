@@ -1,51 +1,47 @@
-#AmazonAnalysis
-library(tidymodels)
-library(embed)
+# =============================================================================
+# Amazon Employee Access — Penalized Logistic Regression (unified pipeline)
+# =============================================================================
+# This script is a thin wrapper around the shared pipeline.
+# Run from project root. Output: results/penalized_logreg_submission.csv
+# and LogRegModelSubmission.csv (legacy name).
+# =============================================================================
 
-#Read data in, set ACTION feature as factor
-train_data <- vroom("data/train.csv") %>%
-  mutate(ACTION = factor(ACTION))
-test_data <- vroom("data/test.csv")
+suppressPackageStartupMessages({
+  library(tidymodels)
+  library(embed)
+  library(vroom)
+  library(tune)
+  library(dials)
+  library(workflows)
+  library(dplyr)
+})
 
-#Create Recipe
-my_recipe <- recipe(ACTION ~ . ,data = train_data) %>%
-  step_mutate_at(all_numeric_predictors() ,fn = factor) %>%
-  step_other(all_nominal_predictors() ,threshold = .001) %>%
-  step_dummy(all_nominal_predictors())
+if (file.exists("R/utils.R")) {
+  source("R/utils.R")
+  source("R/data_loading.R")
+  source("R/preprocessing.R")
+  source("R/models.R")
+  source("R/tuning.R")
+  source("R/predict_submission.R")
+} else {
+  stop("Run this script from the project root (where R/ and data/ live).")
+}
 
-#Prep & Bake Recipe
-prep <- prep(my_recipe)
-baked <- bake(prep ,new_data = train_data)
+model_name <- "penalized_logreg"
+config <- get_config()
+set_pipeline_seed(config$seed)
 
-#Set Up Logistic Regression Model
-logRegModel <- logistic_reg() %>%
-  set_engine("glm")
-
-#Set Workflow
-wf <- workflow() %>%
-  add_recipe(my_recipe) %>%
-  add_model(logRegModel)
-
-#Train Logistic Regression Model
-train <- fit(wf, train_data)
-
-#Get Predictions
-predictions <-predict(train,
-                      new_data = test_data
-                      ,type = "prob")
-
-#Remove p(0) column from df
-predictions <- predictions %>% 
-  select(-.pred_0) %>%
-  #rename .pred_1 as "action" for kaggle submission
-  rename (Action = .pred_1)
-
-
-# Combine with test_data ID
-kaggle_submission <- bind_cols(
-  test_data %>% select(id),
-  predictions
-)
-
-#write submission df to CSV for submission
-vroom_write(kaggle_submission, "LogRegModelSubmission.csv" ,delim = ",")
+dat <- load_data(config, add_freq_encoding = TRUE)
+recipe <- get_recipe_for_model(model_name, dat$train, config)
+wf <- get_workflow(model_name, recipe, config)
+param_info <- get_tune_params(model_name, config)
+folds <- make_resamples(dat$train, config)
+tune_results <- tune_model(wf, folds, config, param_info = param_info)
+print(summarize_tune_results(tune_results, metric = "roc_auc", n = 10L)$best_params)
+best_params <- select_best_params(tune_results, metric = "roc_auc")
+final_fit <- fit_final_model(wf, best_params, dat$train)
+pred_df <- predict_test(final_fit, dat$test, id_col = "id")
+if (!dir.exists("results")) dir.create("results", recursive = TRUE)
+write_kaggle_submission(pred_df, file.path("results", paste0(model_name, "_submission.csv")))
+write_kaggle_submission(pred_df, "LogRegModelSubmission.csv")
+log_msg("Done. Submission also written to LogRegModelSubmission.csv (legacy).")
