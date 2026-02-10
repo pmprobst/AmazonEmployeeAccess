@@ -1,7 +1,7 @@
 # =============================================================================
 # Amazon Employee Access — Random Forest (unified pipeline)
 # =============================================================================
-# Thin wrapper. Output: output/submission/rf_submission.csv and (legacy) RFSubmission.csv.
+# Thin wrapper. Output: output/submission/rf_submission.csv
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -41,5 +41,4 @@ pred_df <- predict_test(final_fit, dat$test, id_col = "id")
 sub_dir <- config$submission_dir %||% "output/submission"
 if (!dir.exists(sub_dir)) dir.create(sub_dir, recursive = TRUE)
 write_kaggle_submission(pred_df, file.path(sub_dir, "rf_submission.csv"))
-write_kaggle_submission(pred_df, "RFSubmission.csv")
-log_msg("Done. Submission also written to RFSubmission.csv (legacy).")
+log_msg("Done.")

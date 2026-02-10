@@ -3,7 +3,6 @@
 # =============================================================================
 # This script is a thin wrapper around the shared pipeline.
 # Run from project root. Output: output/submission/penalized_logreg_submission.csv
-# and LogRegModelSubmission.csv (legacy name).
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -44,5 +43,4 @@ pred_df <- predict_test(final_fit, dat$test, id_col = "id")
 sub_dir <- config$submission_dir %||% "output/submission"
 if (!dir.exists(sub_dir)) dir.create(sub_dir, recursive = TRUE)
 write_kaggle_submission(pred_df, file.path(sub_dir, paste0(model_name, "_submission.csv")))
-write_kaggle_submission(pred_df, "LogRegModelSubmission.csv")
-log_msg("Done. Submission also written to LogRegModelSubmission.csv (legacy).")
+log_msg("Done.")

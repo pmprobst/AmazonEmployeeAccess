@@ -1,13 +1,15 @@
 # =============================================================================
-# Amazon Employee Access — KNN (unified pipeline)
+# Amazon Employee Access — SVM Linear (unified pipeline)
 # =============================================================================
-# Thin wrapper. Output: output/submission/knn_submission.csv and KNNSubmission.csv (legacy).
+# Thin wrapper. For full SVM comparison (linear/poly/RBF) use run_model.R or
+# extend R/models.R. Output: output/submission/svm_linear_submission.csv
 # =============================================================================
 
 suppressPackageStartupMessages({
   library(tidymodels)
   library(embed)
   library(vroom)
+  library(kernlab)
   library(tune)
   library(dials)
   library(workflows)
@@ -25,7 +27,7 @@ if (file.exists("R/utils.R")) {
   stop("Run this script from the project root.")
 }
 
-model_name <- "knn"
+model_name <- "svm_linear"
 config <- get_config()
 set_pipeline_seed(config$seed)
 
@@ -40,6 +42,5 @@ final_fit <- fit_final_model(wf, best_params, dat$train)
 pred_df <- predict_test(final_fit, dat$test, id_col = "id")
 sub_dir <- config$submission_dir %||% "output/submission"
 if (!dir.exists(sub_dir)) dir.create(sub_dir, recursive = TRUE)
-write_kaggle_submission(pred_df, file.path(sub_dir, "knn_submission.csv"))
-write_kaggle_submission(pred_df, "KNNSubmission.csv")
-log_msg("Done. Submission also written to KNNSubmission.csv (legacy).")
+write_kaggle_submission(pred_df, file.path(sub_dir, "svm_linear_submission.csv"))
+log_msg("Done.")

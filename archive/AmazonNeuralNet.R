@@ -1,14 +1,13 @@
 # =============================================================================
-# Amazon Employee Access — Naive Bayes (unified pipeline)
+# Amazon Employee Access — MLP Neural Net (unified pipeline)
 # =============================================================================
-# Thin wrapper. Output: output/submission/nb_submission.csv and NaiveBayesSubmission.csv (legacy).
+# Thin wrapper. Output: output/submission/mlp_submission.csv
 # =============================================================================
 
 suppressPackageStartupMessages({
   library(tidymodels)
   library(embed)
   library(vroom)
-  library(discrim)
   library(tune)
   library(dials)
   library(workflows)
@@ -26,7 +25,7 @@ if (file.exists("R/utils.R")) {
   stop("Run this script from the project root.")
 }
 
-model_name <- "nb"
+model_name <- "mlp"
 config <- get_config()
 set_pipeline_seed(config$seed)
 
@@ -41,6 +40,5 @@ final_fit <- fit_final_model(wf, best_params, dat$train)
 pred_df <- predict_test(final_fit, dat$test, id_col = "id")
 sub_dir <- config$submission_dir %||% "output/submission"
 if (!dir.exists(sub_dir)) dir.create(sub_dir, recursive = TRUE)
-write_kaggle_submission(pred_df, file.path(sub_dir, "nb_submission.csv"))
-write_kaggle_submission(pred_df, "NaiveBayesSubmission.csv")
-log_msg("Done. Submission also written to NaiveBayesSubmission.csv (legacy).")
+write_kaggle_submission(pred_df, file.path(sub_dir, "mlp_submission.csv"))
+log_msg("Done.")

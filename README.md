@@ -33,6 +33,7 @@ A modular machine learning pipeline for the **Kaggle Amazon Employee Access** pr
 │   └── test.csv
 ├── output/
 │   └── submission/       # Submission CSVs (default; created when run)
+├── archive/              # Legacy per-model scripts (use run_model.R instead)
 ├── results/             # Tune RDS and metrics (when using results_dir)
 ├── Amazon*.R             # Thin wrappers per model (backwards compatibility)
 ├── ENVIRONMENT.md        # R packages and reproducibility
@@ -59,10 +60,7 @@ A modular machine learning pipeline for the **Kaggle Amazon Employee Access** pr
    Rscript run_all_models.R --output_dir results
    ```
 
-4. **Legacy scripts:** Each `Amazon*.R` script (e.g. `AmazonLogisticRegression.R`) is a thin wrapper that runs the same pipeline for that model and writes to `output/submission/<model>_submission.csv` and the original submission filename (e.g. `LogRegModelSubmission.csv`). Run from the project root in R:
-   ```r
-   source("AmazonLogisticRegression.R")
-   ```
+4. **Legacy scripts:** Per-model wrappers are in `archive/` (e.g. `archive/AmazonKNN.R`). To run one from R: `source("archive/AmazonKNN.R")` from the project root. Prefer `run_model.R` or `run_all_models.R` instead.
 
 ## Configuration
 

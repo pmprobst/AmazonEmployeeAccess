@@ -2,6 +2,8 @@
 results/
 output/submission/*.csv
 *.rds
+# Legacy submission CSVs in project root (use output/submission/ instead)
+/*Submission.csv
 sessionInfo.txt
 
 # R

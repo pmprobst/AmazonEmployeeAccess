@@ -1,7 +1,8 @@
 # =============================================================================
-# Amazon Employee Access — MLP Neural Net (unified pipeline)
+# Amazon Employee Access — Penalized Logistic Regression (grid + SMOTE variant)
 # =============================================================================
-# Thin wrapper. Output: output/submission/mlp_submission.csv and MLPSubmission.csv (legacy).
+# Thin wrapper around the unified pipeline. Uses config (e.g. use_smote, tune_method).
+# Output: output/submission/penalized_logreg_submission.csv
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -25,11 +26,12 @@ if (file.exists("R/utils.R")) {
   stop("Run this script from the project root.")
 }
 
-model_name <- "mlp"
+model_name <- "penalized_logreg"
 config <- get_config()
+# Uses same pipeline as run_model.R -- penalized_logreg (logit recipe). Set use_smote in config if desired.
 set_pipeline_seed(config$seed)
 
-dat <- load_data(config, add_freq_encoding = FALSE)
+dat <- load_data(config, add_freq_encoding = TRUE)
 recipe <- get_recipe_for_model(model_name, dat$train, config)
 wf <- get_workflow(model_name, recipe, config)
 param_info <- get_tune_params(model_name, config)
@@ -40,6 +42,5 @@ final_fit <- fit_final_model(wf, best_params, dat$train)
 pred_df <- predict_test(final_fit, dat$test, id_col = "id")
 sub_dir <- config$submission_dir %||% "output/submission"
 if (!dir.exists(sub_dir)) dir.create(sub_dir, recursive = TRUE)
-write_kaggle_submission(pred_df, file.path(sub_dir, "mlp_submission.csv"))
-write_kaggle_submission(pred_df, "MLPSubmission.csv")
-log_msg("Done. Submission also written to MLPSubmission.csv (legacy).")
+write_kaggle_submission(pred_df, file.path(sub_dir, paste0(model_name, "_submission.csv")))
+log_msg("Done.")
