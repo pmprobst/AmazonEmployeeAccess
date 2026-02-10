@@ -35,18 +35,25 @@ A modular machine learning pipeline for the **Kaggle Amazon Employee Access** pr
 │   └── submission/       # Submission CSVs (default; created when run)
 ├── archive/              # Legacy per-model scripts (use run_model.R instead)
 ├── results/             # Tune RDS and metrics (when using results_dir)
-├── Amazon*.R             # Thin wrappers per model (backwards compatibility)
-├── ENVIRONMENT.md        # R packages and reproducibility
 └── README.md
 ```
 
+## Requirements
+
+R with the **tidymodels** ecosystem. Install from CRAN:
+
+```r
+install.packages(c(
+  "tidymodels", "embed", "vroom", "tune", "themis",
+  "ranger", "kknn", "kernlab", "naivebayes", "nnet", "glmnet", "discrim"
+))
+```
+
+Optional: **themis** only if you set `use_smote = TRUE` in config. To capture your environment (e.g. for reproducibility), run `sessionInfo()` or use `renv::snapshot()` after `renv::init()`.
+
 ## Quickstart
 
-1. **Install dependencies** (see [ENVIRONMENT.md](ENVIRONMENT.md)):
-   ```r
-   install.packages(c("tidymodels", "embed", "vroom", "tune", "themis",
-                     "ranger", "kknn", "kernlab", "naivebayes", "nnet", "glmnet", "discrim"))
-   ```
+1. **Install dependencies** (see Requirements above).
 
 2. **Run a single model** from the project root:
    ```bash
@@ -71,7 +78,7 @@ Edit `config.R` to change:
 - `use_smote`, `pca_threshold`, `rare_threshold`
 - Model-specific tuning ranges (e.g. `logreg_penalty_range`, `rf_mtry_range`)
 
-Defaults work without editing; override only what you need.
+Defaults work without editing; override only what you need. If you remove `config.R`, the pipeline uses built-in defaults from `R/utils.R`.
 
 ## Results
 
